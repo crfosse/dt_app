@@ -1,0 +1,34 @@
+#
+# Copyright (c) 2019 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+#
+
+menu "nRF CoAP client sample"
+
+config COAP_UP_RESOURCE
+	string "CoAP resource - defaults to Californium observable resource"
+	default "nrf9160/val"
+
+config COAP_DOWN_RESOURCE
+	string "CoAP resource - defaults to Californium observable resource"
+	default "obs"	
+
+config COAP_SERVER_HOSTNAME
+	string "CoAP server hostname"
+	default "californium.eclipse.org"
+
+config COAP_SERVER_PORT
+	int "CoAP server port"
+	default 5683
+
+module = APP
+module-dep = LOG
+module-str = Log level for sample
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endmenu
+
+menu "Zephyr Kernel"
+source "$ZEPHYR_BASE/Kconfig.zephyr"
+endmenu
