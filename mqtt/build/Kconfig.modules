@@ -1,6 +1,0 @@
-osource "/Users/crfosse/nordic/ncs/nrf/Kconfig.nrf"
-
-osource "/Users/crfosse/nordic/ncs/bootloader/mcuboot/zephyr/Kconfig"
-
-osource "/Users/crfosse/nordic/ncs/nrfxlib/Kconfig.nrfxlib"
-

@@ -61,12 +61,12 @@ u8_t * testData = "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh
             	  "AH1MSzQuBq5BLjPC6KhWj519pymLg11fSvhgWlOnhfuSNlmqq9pysYmZIPUNKGOP9gfpEKm8tCuvpUWZvoFsrmxfYQNe9vUznG0PZMhHDSc5C6wDBpFqDBhHEHRdg0KRDf8CU5RsaaviBtI8yFb0plaRQjzTYg2xZcppX4NANeqB0udVdEdfhIxX6iVXcEb5lGY0a35dDRjCgL7ePgZn7oQbLuusUurDbprEu2msxDXz94KJPwhnMldretN5bgq7"
 				  "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SXIpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyyaep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF70KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbI";		
 
-struct modem_param_info info_params;
+/*struct modem_param_info info_params;
 char modem_info_buff[MODEM_INFO_MAX_RESPONSE_SIZE];
 static struct rsrp_data rsrp = {
 	.value = 0,
 	.offset = MODEM_INFO_RSRP_OFFSET_VAL,
-};
+};*/
 
 //application specific definitions
 u8_t sensor_data_buffer[SENSOR_BUFFER_SIZE];
@@ -131,6 +131,40 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 	return;
 }
 
+/**@brief Initializes buttons and LEDs, using the DK buttons and LEDs
+ * library.
+ */
+static void buttons_leds_init(void)
+{
+	int err;
+
+	LOG_INF("DEV_DBG: Initalizing buttons and leds.\n");
+
+	err = dk_buttons_init(button_handler);
+	if (err) {
+		LOG_ERR("Could not initialize buttons, err code: %d\n", err);
+	}
+
+	err = dk_leds_init();
+	if (err) {
+		LOG_ERR("Could not initialize leds, err code: %d\n", err);
+	}
+
+	err = dk_set_leds_state(DK_ALL_LEDS_MSK, DK_NO_LEDS_MSK);
+	if (err) {
+		LOG_ERR("Could not set leds state, err code: %d\n", err);
+	}
+}
+
+/* @brief returns a random "sample"*/
+static u8_t sensor_data_get() {
+	u8_t random_sample;
+	
+	random_sample = sys_rand32_get() % 255;
+
+	return random_sample;
+}
+
 void setup_psm(void)
 {
 	/*
@@ -161,39 +195,6 @@ void setup_psm(void)
 	}
 }
 
-/**@brief Initializes buttons and LEDs, using the DK buttons and LEDs
- * library.
- */
-static void buttons_leds_init(void)
-{
-	int err;
-
-	LOG_INF("DEV_DBG: Initalizing buttons and leds.\n");
-
-	err = dk_buttons_init(button_handler);
-	if (err) {
-		LOG_ERR("Could not initialize buttons, err code: %d\n", err);
-	}
-
-	err = dk_leds_init();
-	if (err) {
-		LOG_ERR("Could not initialize leds, err code: %d\n", err);
-	}
-
-	err = dk_set_leds_state(DK_NO_LEDS_MSK, DK_ALL_LEDS_MSK);
-	if (err) {
-		LOG_ERR("Could not set leds state, err code: %d\n", err);
-	}
-}
-
-static u8_t sensor_data_get() {
-	u8_t random_sample;
-	
-	random_sample = sys_rand32_get() % 255;
-
-	return random_sample;
-}
-
 void app_timer_handler(struct k_timer *dummy)
 {
 	static u32_t minutes;
@@ -201,8 +202,11 @@ void app_timer_handler(struct k_timer *dummy)
 	minutes++;
 	/* This shall match the PSM interval*/
 	if (minutes % actual_tau == 0) {
+		LOG_INF("Awake - transmit true");
 		transmit = true;
 	}
+
+	LOG_INF("MQTT Connection status: %d", mqtt_connected());
 	LOG_INF("Elapsed time: %d\n", minutes);
 }
 
@@ -217,12 +221,12 @@ void timer_init(void)
 
 /* @brief updates the global RSRP value when it is received from the modem.*/
 // TODO: make this atomic, so it's not updated while in use.
-static void rsrp_notification_handler(char rsrp_value) {
+/*static void rsrp_notification_handler(char rsrp_value) {
 	rsrp.value = rsrp_value;
-}
+}*/
 
 
-static int init_modem_info(struct modem_param_info *modem_params) {
+/*static int init_modem_info(struct modem_param_info *modem_params) {
 
 	int err;
 
@@ -233,7 +237,7 @@ static int init_modem_info(struct modem_param_info *modem_params) {
 	err = modem_info_rsrp_register(rsrp_notification_handler);
 
 	return err;
-}
+*}*/
 
 
 void main(void)
@@ -241,50 +245,52 @@ void main(void)
 	int err;
 
 	printk("\nDT Sensor application example started\n");
+
 	buttons_leds_init();
-
-	err = init_modem_info(&info_params);
-
-	//init_work(&app_work_q);
-
-	// Work initialization
-	//k_delayed_work_init(&rsrp_work, rsrp_log);
-
+	setup_psm();
 	modem_configure();
 
-	setup_psm();
+	
 
-	init_modem_info(&info_params);
+	//Waiting for the network to respond to the PSM request
+	LOG_INF("Waiting for network response for PSM");
+	k_sleep(K_SECONDS(30));
 
-	mqtt_start_thread();
+	//err = init_modem_info(&info_params);
 
+	// The network can provide other PSM values. So we fetch the actual values of the network 
 	int curr_active;
-	lte_lc_psm_get(&actual_tau, &curr_active);
+	err = lte_lc_psm_get(&actual_tau, &curr_active);
 	LOG_INF("Reqested: TAU = %s | AT = %s", log_strdup(CONFIG_LTE_PSM_REQ_RPTAU), log_strdup(CONFIG_LTE_PSM_REQ_RAT));
 	LOG_INF("Got: TAU = %d | AT = %d", actual_tau, curr_active);
 
 	// Converting TAU to minutes
 	actual_tau = actual_tau/60;
 
-	LOG_INF("Actual TAU [minutes]: %d", actual_tau);
-
+	mqtt_start_thread();
 	while(!mqtt_connected()) {
 		k_sleep(100);
 	}
-	uint8_t sample_acc = 0;
-	u8_t current_sample;
-	uint8_t sample_cnt = 0;
 
-	LOG_INF("----LOG_START----");
-	LOG_INF("TYPE | TIME | RSRP | SAMPLE");
+
+	//uint8_t sample_acc = 0;
+	//uint8_t sample_cnt = 0;
+
+	//LOG_INF("----LOG_START----");
+	//LOG_INF("TYPE | TIME | RSRP | SAMPLE");
 
 	timer_init();
 
-	//For testing purposes we ensure that an alarm is only issued once every cycle
-	//bool alarm_already = false;
+	u8_t current_sample;
+	bool transmit_finished = false;
 
-	//Lighting LED1 to indicate that we have entered the loop.
-	dk_set_led_on(DK_LED1);
+	if(err) {
+		LOG_ERR("Initialization error");
+		return;
+	}
+
+	//Lighting LED1 to indicate that the application is connected and enterin main loop.
+	dk_set_led(DK_LED1, 0);
 
 	while(1) {
 		current_sample = sensor_data_get();
@@ -302,14 +308,21 @@ void main(void)
 
 		if (transmit) {
 			//Lighting LED2 to indicate that transmission is initiated
-			dk_set_led_on(DK_LED2);
+			dk_set_led(DK_LED2, 0);
 
 			//Data upload
-			mqtt_data_publish(&current_sample,1);
-			LOG_INF("periodic,%s,%d,%d", log_strdup(modem_info_buff), rsrp.value, sample_acc/sample_cnt);
+			/*err = mqtt_data_publish(&current_sample,1);
+			if (err < 0) {
+					LOG_ERR("MQTT_PUBLISH ret %d", err);
+					return;
+			}*()
+			//LOG_INF("periodic,%s,%d,%d", log_strdup(modem_info_buff), rsrp.value, sample_acc/sample_cnt); */
+			LOG_INF("periodic : %d", current_sample);
 			//alarm_already = false;
 			//sample_cnt = 0;
 			//sample_acc = 0;
+
+			transmit_finished = true;
 		}
 
 		//printk("Current sample: %u\n", current_sample);
@@ -318,10 +331,11 @@ void main(void)
 		
 		k_sleep(K_SECONDS(SAMPLE_INTERVAL));
 
-		if(transmit) {
+		if(transmit && transmit_finished) {
 			//Transmission phase over.
-			dk_set_led_off(DK_LED2);
+			dk_set_led(DK_LED2, 1);
 			transmit = false;
+			transmit_finished = false;
 		}
 	}
 }

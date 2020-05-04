@@ -87,6 +87,27 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 	return;
 }
 
+/**@brief Configures modem to provide LTE link. Blocks until link is
+ * successfully established.
+ */
+static void modem_configure(void)
+{
+#if defined(CONFIG_LTE_LINK_CONTROL)
+	if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
+		/* Do nothing, modem is already turned on
+		 * and connected.
+		 */
+	} else {
+		int err;
+
+		LOG_INF("LTE Link Connecting ...\n");
+		err = lte_lc_init_and_connect();
+		__ASSERT(err == 0, "LTE link could not be established.");
+		LOG_INF("LTE Link Connected!\n");
+	}
+#endif /* defined(CONFIG_LTE_LINK_CONTROL) */
+}
+
 /**@brief Initializes buttons and LEDs, using the DK buttons and LEDs
  * library.
  */
@@ -192,19 +213,17 @@ void init_endpoint(void) {
 void main() {
 	LOG_INF("CoAP sample application started");
 	buttons_leds_init();
-	init_endpoint();
+
 
 	setup_psm();
 
 
-	//Lighting LED1 to indicate that we have entered the loop.
-	dk_set_led(DK_LED2,0);
-	k_sleep(K_SECONDS(2));
-	dk_set_led(DK_LED2,1);
+	modem_configure();
+	init_endpoint();
 
 	//Waiting for the network to respond to the PSM request
-	LOG_INF("Waiting for network response for PSM");
-	k_sleep(K_SECONDS(30));
+	//LOG_INF("Waiting for network response for PSM");
+	//k_sleep(K_SECONDS(30));
 
 	// The network can provide other PSM values. So we fetch the actual values of the network 
 	int curr_active;
@@ -221,7 +240,7 @@ void main() {
 	u8_t current_sample;
 	bool transmit_finished = false;
 
-	//Lighting LED1 to indicate that we have entered the loop.
+	//Lighting LED1 to indicate that the application is connected and enterin main loop.
 	dk_set_led(DK_LED1, 0);
 	while(1) {
 		current_sample = sensor_data_get();
