@@ -57,7 +57,7 @@ static int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 	u8_t *data, size_t len)
 {
 	struct mqtt_publish_param param;
-
+	
 	param.message.topic.qos = qos;
 	param.message.topic.topic.utf8 = CONFIG_MQTT_PUB_TOPIC;
 	param.message.topic.topic.size = strlen(CONFIG_MQTT_PUB_TOPIC);
@@ -287,13 +287,24 @@ static void client_init(struct mqtt_client *client)
 
 	broker_init();
 
+    struct mqtt_utf8 username = {
+		.utf8 = (u8_t*)CONFIG_APP_MQTT_USERNAME,
+		.size = strlen(CONFIG_APP_MQTT_USERNAME)
+	};
+
+	struct mqtt_utf8 password = {
+		.utf8 = (u8_t*)CONFIG_APP_MQTT_PASSWORD,
+		.size = strlen(CONFIG_APP_MQTT_PASSWORD)
+	};
+
+
 	/* MQTT client configuration */
 	client->broker = &broker;
 	client->evt_cb = mqtt_evt_handler;
 	client->client_id.utf8 = (u8_t *)CONFIG_MQTT_CLIENT_ID;
 	client->client_id.size = strlen(CONFIG_MQTT_CLIENT_ID);
-	client->password = NULL;
-	client->user_name = NULL;
+	client->password = &password;
+	client->user_name = &username;
 	client->protocol_version = MQTT_VERSION_3_1_1;
 
 	/* MQTT buffers configuration */

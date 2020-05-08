@@ -10,6 +10,8 @@ LOG_MODULE_REGISTER(app_main, CONFIG_APP_LOG_LEVEL);
 
 #define SAMPLE_INTERVAL 1
 
+#define WITH_PSM
+
 // The periodic TAU given by the network
 static int actual_tau; 
 
@@ -17,13 +19,22 @@ static int actual_tau;
 *  according to the periodic TAU					   */
 static bool transmit = false;
 
-#define TEST_DATA_SIZE 1024
+#define TEST_DATA_SIZE 3072
 
 //255 random characters in an array for upload testing
 u8_t * testData = "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SXIpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyyaep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF70KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbID"
 				  "jvdEpZVL88RszUn7Ah4pnTC7rkHRft6apfuZCUqo0udcvNbEaUFncwjsU8zkw8j7mfiD7QxF2A9Kv7XTztxef2Ryj1MbWe0vDAPXUz3yb4AqfgcxPb3TCocDCgAd2F2SxlAZ69913oxzD0M24Sl0YIztsCnTuUrzrgIOrdXWvjOcEcuEJltiIZMygVx8gxwcpwY4YNybojiLfuRET4w91tbTgn33IvFcY8J7tu5Y8LZjk5ZfkekJg5zhZs6Bo2Jm"
 				  "N0mC7eCqYvSBGm4No2TPbLjYD2fB5ERubVuo2rGeZjbnWEx8jcP9jgq049pEjjS9MRXvJnDtpo8hIZcZpz1HKyXbOXbz60baSbpW5RHOhwg1TBh8wrBTOOORMMCBhl4OQApYjcf2w4ZlbyfWUjQY6gkGR21599Wb1IjraQL911QeFjiRFGtcDEpxo5GMWL1OZKM4Gnkp4LP0A0yK9FlHeopsaCOBxOI0dTaq2gWDD8rRRCbYykck0J5IZfQnrBbv"
-            	  "AH1MSzQuBq5BLjPC6KhWj519pymLg11fSvhgWlOnhfuSNlmqq9pysYmZIPUNKGOP9gfpEKm8tCuvpUWZvoFsrmxfYQNe9vUznG0PZMhHDSc5C6wDBpFqDBhHEHRdg0KRDf8CU5RsaaviBtI8yFb0plaRQjzTYg2xZcppX4NANeqB0udVdEdfhIxX6iVXcEb5lGY0a35dDRjCgL7ePgZn7oQbLuusUurDbprEu2msxDXz94KJPwhnMldretN5bgq7";
+            	  "AH1MSzQuBq5BLjPC6KhWj519pymLg11fSvhgWlOnhfuSNlmqq9pysYmZIPUNKGOP9gfpEKm8tCuvpUWZvoFsrmxfYQNe9vUznG0PZMhHDSc5C6wDBpFqDBhHEHRdg0KRDf8CU5RsaaviBtI8yFb0plaRQjzTYg2xZcppX4NANeqB0udVdEdfhIxX6iVXcEb5lGY0a35dDRjCgL7ePgZn7oQbLuusUurDbprEu2msxDXz94KJPwhnMldretN5bgq7"
+				  "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SXIpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyyaep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF70KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbID"
+				  "jvdEpZVL88RszUn7Ah4pnTC7rkHRft6apfuZCUqo0udcvNbEaUFncwjsU8zkw8j7mfiD7QxF2A9Kv7XTztxef2Ryj1MbWe0vDAPXUz3yb4AqfgcxPb3TCocDCgAd2F2SxlAZ69913oxzD0M24Sl0YIztsCnTuUrzrgIOrdXWvjOcEcuEJltiIZMygVx8gxwcpwY4YNybojiLfuRET4w91tbTgn33IvFcY8J7tu5Y8LZjk5ZfkekJg5zhZs6Bo2Jm"
+				  "N0mC7eCqYvSBGm4No2TPbLjYD2fB5ERubVuo2rGeZjbnWEx8jcP9jgq049pEjjS9MRXvJnDtpo8hIZcZpz1HKyXbOXbz60baSbpW5RHOhwg1TBh8wrBTOOORMMCBhl4OQApYjcf2w4ZlbyfWUjQY6gkGR21599Wb1IjraQL911QeFjiRFGtcDEpxo5GMWL1OZKM4Gnkp4LP0A0yK9FlHeopsaCOBxOI0dTaq2gWDD8rRRCbYykck0J5IZfQnrBbv"
+            	  "AH1MSzQuBq5BLjPC6KhWj519pymLg11fSvhgWlOnhfuSNlmqq9pysYmZIPUNKGOP9gfpEKm8tCuvpUWZvoFsrmxfYQNe9vUznG0PZMhHDSc5C6wDBpFqDBhHEHRdg0KRDf8CU5RsaaviBtI8yFb0plaRQjzTYg2xZcppX4NANeqB0udVdEdfhIxX6iVXcEb5lGY0a35dDRjCgL7ePgZn7oQbLuusUurDbprEu2msxDXz94KJPwhnMldretN5bgq7"
+				  "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SXIpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyyaep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF70KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbID"
+				  "jvdEpZVL88RszUn7Ah4pnTC7rkHRft6apfuZCUqo0udcvNbEaUFncwjsU8zkw8j7mfiD7QxF2A9Kv7XTztxef2Ryj1MbWe0vDAPXUz3yb4AqfgcxPb3TCocDCgAd2F2SxlAZ69913oxzD0M24Sl0YIztsCnTuUrzrgIOrdXWvjOcEcuEJltiIZMygVx8gxwcpwY4YNybojiLfuRET4w91tbTgn33IvFcY8J7tu5Y8LZjk5ZfkekJg5zhZs6Bo2Jm"
+				  "N0mC7eCqYvSBGm4No2TPbLjYD2fB5ERubVuo2rGeZjbnWEx8jcP9jgq049pEjjS9MRXvJnDtpo8hIZcZpz1HKyXbOXbz60baSbpW5RHOhwg1TBh8wrBTOOORMMCBhl4OQApYjcf2w4ZlbyfWUjQY6gkGR21599Wb1IjraQL911QeFjiRFGtcDEpxo5GMWL1OZKM4Gnkp4LP0A0yK9FlHeopsaCOBxOI0dTaq2gWDD8rRRCbYykck0J5IZfQnrBbv"
+            	  "AH1MSzQuBq5BLjPC6KhWj519pymLg11fSvhgWlOnhfuSNlmqq9pysYmZIPUNKGOP9gfpEKm8tCuvpUWZvoFsrmxfYQNe9vUznG0PZMhHDSc5C6wDBpFqDBhHEHRdg0KRDf8CU5RsaaviBtI8yFb0plaRQjzTYg2xZcppX4NANeqB0udVdEdfhIxX6iVXcEb5lGY0a35dDRjCgL7ePgZn7oQbLuusUurDbprEu2msxDXz94KJPwhnMldretN5bgq";
+
 
 
 static int message_post(struct coap_resource *resource, struct coap_packet *request, struct sockaddr *addr, socklen_t addr_len) {
@@ -210,49 +221,21 @@ void init_endpoint(void) {
 	net_addr_pton(AF_INET, "172.16.15.14", &remote_addr.sin_addr);
 }
 
-void main() {
-	LOG_INF("CoAP sample application started");
-	buttons_leds_init();
+static int run_periodic(void) {
+	static u8_t current_sample;
+	static bool transmit_finished = false;
 
 
-	setup_psm();
-
-
-	modem_configure();
-	init_endpoint();
-
-	//Waiting for the network to respond to the PSM request
-	//LOG_INF("Waiting for network response for PSM");
-	//k_sleep(K_SECONDS(30));
-
-	// The network can provide other PSM values. So we fetch the actual values of the network 
-	int curr_active;
-	lte_lc_psm_get(&actual_tau, &curr_active);
-	//lte_lc_psm_get_with_cb();
-	LOG_INF("Reqested: TAU = %s | AT = %s", log_strdup(CONFIG_LTE_PSM_REQ_RPTAU), log_strdup(CONFIG_LTE_PSM_REQ_RAT));
-	LOG_INF("Got: TAU = %d | AT = %d", actual_tau, curr_active);
-
-	// Converting TAU to minutes
-	actual_tau = actual_tau/60;
-
-	timer_init();
-
-	u8_t current_sample;
-	bool transmit_finished = false;
-
-	//Lighting LED1 to indicate that the application is connected and enterin main loop.
-	dk_set_led(DK_LED1, 0);
-	while(1) {
-		current_sample = sensor_data_get();
+	current_sample = sensor_data_get();
 		if (transmit) {
 			//Lighting LED2 to indicate that transmission is initiated
 			dk_set_led(DK_LED2, 0);
 
 			//Data upload
 			int ret = coap_endpoint_post(coap, (struct sockaddr *)&remote_addr, sizeof(remote_addr), path, &current_sample, 1);
-				if (ret != COAP_RESPONSE_CODE_CREATED) {
-					LOG_ERR("coap_endpoint_post: %d", ret);
-					return;
+			if (ret != COAP_RESPONSE_CODE_CREATED) {
+				LOG_ERR("coap_endpoint_post: %d", ret);
+				return -1;
 			}
 
 			//LOG_INF("periodic,%s,%d,%d", log_strdup(modem_info_buff), rsrp.value, sample_acc/sample_cnt);
@@ -269,5 +252,85 @@ void main() {
 			transmit = false;
 			transmit_finished = false;
 		}
+
+		return 0;
+}
+
+static int run_size_sweep(void) {
+	static size_t test_index = 0;
+
+	//Lighting LED2 to indicate that transmission is initiated
+	dk_set_led(DK_LED2, 0);
+
+	LOG_INF("Current test_index: %d", test_index);
+	if(test_index < TEST_DATA_SIZE) {
+		int ret = coap_endpoint_post(coap, (struct sockaddr *)&remote_addr, sizeof(remote_addr), path, testData, test_index);
+		if (ret != COAP_RESPONSE_CODE_CREATED) {
+			LOG_ERR("coap_endpoint_post: %d", ret);
+			return -1;
+		}
+		test_index += 10;
+	} else {
+		test_index = 0;
+		int ret = coap_endpoint_post(coap, (struct sockaddr *)&remote_addr, sizeof(remote_addr), path, testData, test_index);
+		if (ret != COAP_RESPONSE_CODE_CREATED) {
+			LOG_ERR("coap_endpoint_post: %d", ret);
+			return -1;
+		}
+	}
+
+	dk_set_led(DK_LED2, 1);
+	k_sleep(K_SECONDS(10));
+
+	return 0;
+}
+
+
+void main() {
+	LOG_INF("CoAP sample application started");
+	
+	int err;
+	
+	buttons_leds_init();
+
+	#ifdef WITH_PSM
+	setup_psm();
+	#endif
+
+	modem_configure();
+	init_endpoint();
+
+	//Waiting for the network to respond to the PSM request
+	//LOG_INF("Waiting for network response for PSM");
+	//k_sleep(K_SECONDS(30));
+
+	#ifdef WITH_PSM
+	// The network can provide other PSM values. So we fetch the actual values of the network 
+	int curr_active;
+	lte_lc_psm_get(&actual_tau, &curr_active);
+	//lte_lc_psm_get_with_cb();
+	LOG_INF("Reqested: TAU = %s | AT = %s", log_strdup(CONFIG_LTE_PSM_REQ_RPTAU), log_strdup(CONFIG_LTE_PSM_REQ_RAT));
+	LOG_INF("Got: TAU = %d | AT = %d", actual_tau, curr_active);
+	// Converting TAU to minutes
+	actual_tau = actual_tau/60;
+
+	timer_init();
+	#endif
+
+
+	//Lighting LED1 to indicate that the application is connected and enterin main loop.
+	dk_set_led(DK_LED1, 0);
+	while(1) {
+		#ifdef WITH_PSM
+			err = run_periodic();
+			if (err < 0) {
+				LOG_ERR("Error in periodic function");
+				return;
+			}
+
+		#else
+			run_size_sweep();
+			k_sleep(100);
+		#endif
 	}
 }

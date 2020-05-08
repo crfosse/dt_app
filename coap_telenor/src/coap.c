@@ -11,7 +11,7 @@
 
 LOG_MODULE_REGISTER(app_coap, CONFIG_APP_LOG_LEVEL);
 
-#define MAX_COAP_MSG_LEN 512
+#define MAX_COAP_MSG_LEN 3072
 #define MAX_COAP_OPTIONS 16
 
 // An inflight_packet represents a packet that has not been acknowledged (and not responded to, if it is a request).
@@ -108,7 +108,7 @@ static inflight_packet *new_inflight_packet(coap_endpoint *ep, packet_tx_data_it
 		inflight->addr = tx->addr;
 		inflight->addr_len = tx->addr_len;
 		inflight->retransmission_count = 0;
-		inflight->timeout = K_SECONDS(2) + sys_rand32_get() % K_SECONDS(1);
+		inflight->timeout = K_SECONDS(10) + sys_rand32_get() % K_SECONDS(1);
 		inflight->deadline = k_uptime_get_32() + inflight->timeout;
 	}
 	inflight->response_handler = tx->response_handler;

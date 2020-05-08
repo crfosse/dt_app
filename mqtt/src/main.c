@@ -21,11 +21,11 @@
 
 LOG_MODULE_REGISTER(app_mqtt_main, CONFIG_APP_LOG_LEVEL);
 
+#define WITH_PSM
+
 //in seconds
 #define SAMPLE_INTERVAL 1
 #define UPLOAD_INTERVAL 60
-
-#define SENSOR_THRESHOLD 254
 
 #define SENSOR_BUFFER_SIZE (UPLOAD_INTERVAL/SAMPLE_INTERVAL)
 
@@ -111,7 +111,7 @@ static void modem_configure(void)
 /**@brief Callback for button events from the DK buttons and LEDs library. */
 static void button_handler(u32_t button_states, u32_t has_changed)
 {
-	 static size_t test_index = TEST_DATA_SIZE-1;
+	 static size_t test_index = 0;
 	 
 	if (has_changed & button_states & DK_BTN1_MSK) {
 		LOG_INF("DEV_DBG: button 1 pressed\n");
@@ -247,17 +247,14 @@ void main(void)
 	printk("\nDT Sensor application example started\n");
 
 	buttons_leds_init();
+	#ifdef WITH_PSM
 	setup_psm();
+	#endif
 	modem_configure();
-
-	
-
-	//Waiting for the network to respond to the PSM request
-	LOG_INF("Waiting for network response for PSM");
-	k_sleep(K_SECONDS(30));
 
 	//err = init_modem_info(&info_params);
 
+	#ifdef WITH_PSM
 	// The network can provide other PSM values. So we fetch the actual values of the network 
 	int curr_active;
 	err = lte_lc_psm_get(&actual_tau, &curr_active);
@@ -267,19 +264,21 @@ void main(void)
 	// Converting TAU to minutes
 	actual_tau = actual_tau/60;
 
+	#endif
+
 	mqtt_start_thread();
 	while(!mqtt_connected()) {
 		k_sleep(100);
 	}
-
 
 	//uint8_t sample_acc = 0;
 	//uint8_t sample_cnt = 0;
 
 	//LOG_INF("----LOG_START----");
 	//LOG_INF("TYPE | TIME | RSRP | SAMPLE");
-
+	#ifdef WITH_PSM
 	timer_init();
+	#endif
 
 	u8_t current_sample;
 	bool transmit_finished = false;
@@ -294,28 +293,17 @@ void main(void)
 
 	while(1) {
 		current_sample = sensor_data_get();
-		//sample_acc += current_sample;
-
-		/*if (current_sample >= SENSOR_THRESHOLD) {
-			modem_info_string_get(MODEM_INFO_DATE_TIME, modem_info_buff);
-			LOG_INF("alarm,%s,%d,%d", log_strdup(modem_info_buff), rsrp.value, current_sample);
-			mqtt_data_publish("alarm",5);
-
-			//alarm_already = true;
-		}*/
-	
-		//sensor_data_buffer[sample_cnt] = sensor_data_get();
 
 		if (transmit) {
 			//Lighting LED2 to indicate that transmission is initiated
 			dk_set_led(DK_LED2, 0);
 
 			//Data upload
-			/*err = mqtt_data_publish(&current_sample,1);
+			err = mqtt_data_publish(&current_sample,1);
 			if (err < 0) {
 					LOG_ERR("MQTT_PUBLISH ret %d", err);
 					return;
-			}*()
+			}
 			//LOG_INF("periodic,%s,%d,%d", log_strdup(modem_info_buff), rsrp.value, sample_acc/sample_cnt); */
 			LOG_INF("periodic : %d", current_sample);
 			//alarm_already = false;

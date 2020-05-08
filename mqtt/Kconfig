@@ -33,6 +33,13 @@ config MQTT_PAYLOAD_BUFFER_SIZE
 	int "MQTT payload buffer size"
 	default 128
 
+config APP_MQTT_PASSWORD
+	string "MQTT Broker password"
+	default NULL
+
+config APP_MQTT_USERNAME
+	string "MQTT Broker username"
+	default NULL
 
 module = APP
 module-dep = LOG
