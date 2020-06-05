@@ -41,6 +41,10 @@ config APP_MQTT_USERNAME
 	string "MQTT Broker username"
 	default NULL
 
+config LTE_PTW_VALUE
+	string "Paging Time Window"
+	default "0011"
+
 module = APP
 module-dep = LOG
 module-str = Log level for sample

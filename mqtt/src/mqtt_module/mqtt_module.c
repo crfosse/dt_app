@@ -35,10 +35,14 @@ static struct mqtt_client client;
 static struct sockaddr_storage broker;
 
 /* Connected flag */
-static bool connected;
+static bool connected = false;
+/* ACK flag */
+static bool puback_received = false;
+
 
 /* File descriptor */
 static struct pollfd fds;
+
 
 /**@brief Function to print strings without null-termination
  */
@@ -72,6 +76,7 @@ static int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 		log_strdup(CONFIG_MQTT_PUB_TOPIC),
 		(unsigned int)strlen(CONFIG_MQTT_PUB_TOPIC));
 
+	puback_received = false;
 	return mqtt_publish(c, &param);
 }
 
@@ -201,6 +206,8 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 			break;
 		}
 
+		puback_received = true;
+
 		LOG_DBG("[%s:%d] PUBACK packet id: %u\n", log_strdup(__func__), __LINE__,
 				evt->param.puback.message_id);
 		break;
@@ -220,6 +227,22 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 				evt->type);
 		break;
 	}
+}
+
+int wait_for_puback(s32_t timeout) {
+	s32_t time = 0;
+
+	while(!puback_received) {
+		k_sleep(100);
+		time += 100;
+		if(time > timeout) {
+			LOG_ERR("PubAck timeout");
+			return -1;
+		}
+	}
+
+	puback_received = false;
+	return 0;
 }
 
 /**@brief Resolves the configured hostname and

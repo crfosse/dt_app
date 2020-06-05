@@ -5,6 +5,10 @@ module-dep = LOG
 module-str = Log level for application
 source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
 
+config LTE_PTW_VALUE
+	string "Paging Time Window"
+	default "0011"
+
 endmenu
 
 menu "Zephyr Kernel"

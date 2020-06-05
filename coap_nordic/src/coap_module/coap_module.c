@@ -95,9 +95,6 @@ static int client_init(void)
 	fds.fd = sock;
 	fds.events = POLLIN;
 
-	/* Randomize token. */
-	next_token = sys_rand32_get();
-
 	return 0;
 }
 
@@ -263,7 +260,6 @@ void coap_start_thread() {
 
 static void coap_thread(void *blank1, void *blank2, void *blank3)
 {
-	s64_t next_msg_time = APP_COAP_SEND_INTERVAL_MS;
 	int err, received;
 
 	if (server_resolve() != 0) {
@@ -278,25 +274,10 @@ static void coap_thread(void *blank1, void *blank2, void *blank3)
 
 	connected = true;
 	printk("CoAP connected!\n");
-	next_msg_time = k_uptime_get();
 
 	while (1) {
-		if (k_uptime_get() >= next_msg_time) {
-			if (client_get_send() != 0) {
-				printk("Failed to send GET request, exit...\n");
-				connected = false;
-				break;
-			}
 
-			next_msg_time += APP_COAP_SEND_INTERVAL_MS;
-		}
-
-		s64_t remaining = next_msg_time - k_uptime_get();
-		if (remaining < 0) {
-			remaining = 0;
-		}
-
-		err = wait(remaining);
+		err = wait(K_FOREVER);
 		if (err < 0) {
 			if (err == -EAGAIN) {
 				continue;

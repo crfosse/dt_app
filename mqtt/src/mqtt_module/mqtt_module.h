@@ -7,12 +7,14 @@
 #define _MQTT_MODULE_H_
 
 #define MQTT_THREAD_STACK_SIZE 2048
-#define MQTT_THREAD_PRIORITY 8
+#define MQTT_THREAD_PRIORITY -1
 
 void mqtt_start_thread();
 
 int mqtt_data_publish(u8_t *data, size_t len);
 
 int mqtt_connected(void);
+
+int wait_for_puback(s32_t timeout);
 
 #endif

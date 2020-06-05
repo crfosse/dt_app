@@ -11,8 +11,11 @@
 
 LOG_MODULE_REGISTER(app_coap, CONFIG_APP_LOG_LEVEL);
 
-#define MAX_COAP_MSG_LEN 3072
-#define MAX_COAP_OPTIONS 16
+#define MAX_COAP_MSG_LEN 1472 //With 20 bytes of options this indicates the biggiest possible CoAP packet. Including headers, token, options and payload. Given an MTU of 1500, with IPv4 and UDP overhead. 
+#define MAX_COAP_OPTIONS 16 //This is maximum received options. 
+
+#define RECV_THREAD_STACK_SIZE 1024
+#define RECV_THREAD_PRIORITY -1
 
 // An inflight_packet represents a packet that has not been acknowledged (and not responded to, if it is a request).
 // This struct takes ownership of the packet and is responsible for freeing it.
@@ -73,6 +76,8 @@ static void recv_thread(void *p1, void *p2, void *p3) {
 			return;
 		}
 
+		LOG_DBG("Options size: %d", sizeof(rx->options));
+
 		int err = coap_packet_parse(&rx->packet, rx->data, sizeof(rx->data), rx->options, MAX_COAP_OPTIONS);
 		if (err < 0) {
 			LOG_ERR("coap_packet_parse: %d", err);
@@ -84,8 +89,6 @@ static void recv_thread(void *p1, void *p2, void *p3) {
 	}
 }
 
-#define RECV_THREAD_STACK_SIZE 1024
-#define RECV_THREAD_PRIORITY -1
 K_THREAD_STACK_DEFINE(recv_thread_stack_area, RECV_THREAD_STACK_SIZE);
 static struct k_thread recv_thread_data;
 static k_tid_t recv_thread_tid;
@@ -183,9 +186,15 @@ static void transmit_packet(packet_tx_data_item *tx, coap_endpoint *ep, int sock
 		return;
 	}
 
+	LOG_DBG("DEV - data size: %d", sizeof(tx->packet.data));
+	LOG_DBG("DEV - offset size: %d", sizeof(tx->packet.offset));
+	
+
 	if (sendto(sock, tx->packet.data, tx->packet.offset, 0, &tx->addr, tx->addr_len) < 0) {
 		LOG_ERR("sendto: %d", errno);
 	}
+
+	LOG_DBG("DEV: packet transmitted.");
 
 	if (coap_header_get_type(&tx->packet) != COAP_TYPE_CON) {
 		k_free(tx->packet.data);
@@ -212,6 +221,8 @@ static void retransmit_packet(coap_endpoint *ep, inflight_packet *inflight) {
 	if (sendto(ep->sock, inflight->packet.data, inflight->packet.offset, 0, &inflight->addr, inflight->addr_len) < 0) {
 		LOG_ERR("sendto: %d", errno);
 	}
+
+	LOG_DBG("DEV: packet retransmitted.");
 }
 
 static enum coap_response_code response_code_for_error(int err) {
@@ -396,6 +407,8 @@ void post_handler(void *p, int err, struct coap_packet *response) {
 	} else {
 		data->ret = coap_header_get_code(response);
 
+		LOG_DBG("Got response: %d", coap_header_get_type(response));
+
 		err = coap_endpoint_acknowledge(data->ep, response, data->addr, data->addr_len);
 		if (err != 0) {
 			LOG_ERR("coap_endpoint_acknowledge: %d", err);
@@ -442,11 +455,14 @@ int coap_endpoint_post_async(coap_endpoint *ep, struct sockaddr *addr, socklen_t
 
 	int err;
 
+
+
 	err = coap_packet_init(&tx->packet, data, MAX_COAP_MSG_LEN, 1, COAP_TYPE_CON, 8, coap_next_token(), COAP_METHOD_POST, coap_next_id());
 	if (err < 0) {
 		LOG_ERR("coap_packet_init: %d", err);
 		goto error;
 	}
+
 
 	for (const char *const *p = path; p && *p; p++) {
 		err = coap_packet_append_option(&tx->packet, COAP_OPTION_URI_PATH, *p, strlen(*p));
@@ -454,6 +470,8 @@ int coap_endpoint_post_async(coap_endpoint *ep, struct sockaddr *addr, socklen_t
 			LOG_ERR("coap_packet_append_option: %d", err);
 			goto error;
 		}
+		LOG_DBG("DEV - appending option");
+		LOG_DBG("DEV - opt_len: %d", *(&tx->packet.opt_len));
 	}
 
 	if (payload != NULL && payload_len > 0) {
@@ -469,6 +487,7 @@ int coap_endpoint_post_async(coap_endpoint *ep, struct sockaddr *addr, socklen_t
 			goto error;
 		}
 	}
+
 
 	k_fifo_put(&tx_fifo, tx);
 

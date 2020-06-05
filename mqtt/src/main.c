@@ -22,13 +22,22 @@
 LOG_MODULE_REGISTER(app_mqtt_main, CONFIG_APP_LOG_LEVEL);
 
 #define WITH_PSM
+#define TEST_PERIODIC
+//#define TEST_SWEEP
+
+#define MAX_SAMPLES 5
+#define PERIODIC_MSG_SIZE 4096
 
 //in seconds
 #define SAMPLE_INTERVAL 1
-#define UPLOAD_INTERVAL 60
 
-#define SENSOR_BUFFER_SIZE (UPLOAD_INTERVAL/SAMPLE_INTERVAL)
+#define SIZE_STEP 64
 
+#ifdef CONFIG_LTE_NETWORK_MODE_NBIOT
+#define SWEEP_INTERVAL 40 //S
+#else
+#define SWEEP_INTERVAL 30
+#endif
 //static bool leds_on = true;
 
 struct k_work alarm_work;
@@ -42,13 +51,14 @@ struct rsrp_data {
 };
 
 // The periodic TAU given by the network
-static int actual_tau; 
+static int actual_tau = 10; 
 
 /* Indicates when the application is ready to transmit *
 *  according to the periodic TAU					   */
 static bool transmit = false;
 
-#define TEST_DATA_SIZE 2304
+// Actual maximum payload size
+#define TEST_DATA_SIZE 4096
 
 //255 random characters in an array for upload testing
 u8_t * testData = "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SXIpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyyaep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF70KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbID"
@@ -59,22 +69,24 @@ u8_t * testData = "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh
 				  "jvdEpZVL88RszUn7Ah4pnTC7rkHRft6apfuZCUqo0udcvNbEaUFncwjsU8zkw8j7mfiD7QxF2A9Kv7XTztxef2Ryj1MbWe0vDAPXUz3yb4AqfgcxPb3TCocDCgAd2F2SxlAZ69913oxzD0M24Sl0YIztsCnTuUrzrgIOrdXWvjOcEcuEJltiIZMygVx8gxwcpwY4YNybojiLfuRET4w91tbTgn33IvFcY8J7tu5Y8LZjk5ZfkekJg5zhZs6Bo2Jm"
 				  "N0mC7eCqYvSBGm4No2TPbLjYD2fB5ERubVuo2rGeZjbnWEx8jcP9jgq049pEjjS9MRXvJnDtpo8hIZcZpz1HKyXbOXbz60baSbpW5RHOhwg1TBh8wrBTOOORMMCBhl4OQApYjcf2w4ZlbyfWUjQY6gkGR21599Wb1IjraQL911QeFjiRFGtcDEpxo5GMWL1OZKM4Gnkp4LP0A0yK9FlHeopsaCOBxOI0dTaq2gWDD8rRRCbYykck0J5IZfQnrBbv"
             	  "AH1MSzQuBq5BLjPC6KhWj519pymLg11fSvhgWlOnhfuSNlmqq9pysYmZIPUNKGOP9gfpEKm8tCuvpUWZvoFsrmxfYQNe9vUznG0PZMhHDSc5C6wDBpFqDBhHEHRdg0KRDf8CU5RsaaviBtI8yFb0plaRQjzTYg2xZcppX4NANeqB0udVdEdfhIxX6iVXcEb5lGY0a35dDRjCgL7ePgZn7oQbLuusUurDbprEu2msxDXz94KJPwhnMldretN5bgq7"
-				  "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SXIpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyyaep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF70KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbI";		
+				  "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SXIpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyyaep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF70KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbID"
+				  "jvdEpZVL88RszUn7Ah4pnTC7rkHRft6apfuZCUqo0udcvNbEaUFncwjsU8zkw8j7mfiD7QxF2A9Kv7XTztxef2Ryj1MbWe0vDAPXUz3yb4AqfgcxPb3TCocDCgAd2F2SxlAZ69913oxzD0M24Sl0YIztsCnTuUrzrgIOrdXWvjOcEcuEJltiIZMygVx8gxwcpwY4YNybojiLfuRET4w91tbTgn33IvFcY8J7tu5Y8LZjk5ZfkekJg5zhZs6Bo2Jm"
+				  "N0mC7eCqYvSBGm4No2TPbLjYD2fB5ERubVuo2rGeZjbnWEx8jcP9jgq049pEjjS9MRXvJnDtpo8hIZcZpz1HKyXbOXbz60baSbpW5RHOhwg1TBh8wrBTOOORMMCBhl4OQApYjcf2w4ZlbyfWUjQY6gkGR21599Wb1IjraQL911QeFjiRFGtcDEpxo5GMWL1OZKM4Gnkp4LP0A0yK9FlHeopsaCOBxOI0dTaq2gWDD8rRRCbYykck0J5IZfQnrBbv"
+            	  "AH1MSzQuBq5BLjPC6KhWj519pymLg11fSvhgWlOnhfuSNlmqq9pysYmZIPUNKGOP9gfpEKm8tCuvpUWZvoFsrmxfYQNe9vUznG0PZMhHDSc5C6wDBpFqDBhHEHRdg0KRDf8CU5RsaaviBtI8yFb0plaRQjzTYg2xZcppX4NANeqB0udVdEdfhIxX6iVXcEb5lGY0a35dDRjCgL7ePgZn7oQbLuusUurDbprEu2msxDXz94KJPwhnMldretN5bgq7"
+				  "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SXIpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyyaep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF70KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbID"
+				  "jvdEpZVL88RszUn7Ah4pnTC7rkHRft6apfuZCUqo0udcvNbEaUFncwjsU8zkw8j7mfiD7QxF2A9Kv7XTztxef2Ryj1MbWe0vDAPXUz3yb4AqfgcxPb3TCocDCgAd2F2SxlAZ69913oxzD0M24Sl0YIztsCnTuUrzrgIOrdXWvjOcEcuEJltiIZMygVx8gxwcpwY4YNybojiLfuRET4w91tbTgn33IvFcY8J7tu5Y8LZjk5ZfkekJg5zhZs6Bo2Jm"
+				  "N0mC7eCqYvSBGm4No2TPbLjYD2fB5ERubVuo2rGeZjbnWEx8jcP9jgq049pEjjS9MRXvJnDtpo8hIZcZpz1HKyXbOXbz60baSbpW5RHOhwg1TBh8wrBTOOORMMCBhl4OQApYjcf2w4ZlbyfWUjQY6gkGR21599Wb1IjraQL911QeFjiRFGtcDEpxo5GMWL1OZKM4Gnkp4LP0A0yK9FlHeopsaCOBxOI0dTaq2gWDD8rRRCbYykck0J5IZfQnrBbv"
+            	  "AH1MSzQuBq5BLjPC6KhWj519pymLg11fSvhgWlOnhfuSNlmqq9pysYmZIPUNKGOP9gfpEKm8tCuvpUWZvoFsrmxfYQNe9vUznG0PZMhHDSc5C6wDBpFqDBhHEHRdg0KRDf8CU5RsaaviBtI8yFb0plaRQjzTYg2xZcppX4NANeqB0udVdEdfhIxX6iVXcEb5lGY0a35dDRjCgL7ePgZn7oQbLuusUurDbprEu2msxDXz94KJPwhnMldretN5bgq";		
 
-/*struct modem_param_info info_params;
-char modem_info_buff[MODEM_INFO_MAX_RESPONSE_SIZE];
+#ifdef CONFIG_MODEM_INFO				  
+//struct modem_param_info info_params;
+//char modem_info_buff[MODEM_INFO_MAX_RESPONSE_SIZE];
 static struct rsrp_data rsrp = {
 	.value = 0,
 	.offset = MODEM_INFO_RSRP_OFFSET_VAL,
-};*/
-
-//application specific definitions
-u8_t sensor_data_buffer[SENSOR_BUFFER_SIZE];
-
-enum msg_type {
-	alarm,
-	periodic
 };
+#endif
+
 
 #if defined(CONFIG_BSD_LIBRARY)
 
@@ -107,27 +119,37 @@ static void modem_configure(void)
 #endif /* defined(CONFIG_LTE_LINK_CONTROL) */
 }
 
+/* @brief returns a random "sample"*/
+static u8_t sensor_data_get() {
+	u8_t random_sample;
+	
+	random_sample = sys_rand32_get() % 255;
+
+	return random_sample;
+}
 
 /**@brief Callback for button events from the DK buttons and LEDs library. */
 static void button_handler(u32_t button_states, u32_t has_changed)
 {
-	 static size_t test_index = 0;
+	u8_t sample = 0;
+	int err;
 	 
 	if (has_changed & button_states & DK_BTN1_MSK) {
 		LOG_INF("DEV_DBG: button 1 pressed\n");
-		LOG_INF("Current test_index: %d", test_index);
-		if(test_index < TEST_DATA_SIZE) {
-			mqtt_data_publish(testData,test_index);
-			test_index += 5;
-		} else {
-			test_index = 0;
-			mqtt_data_publish(testData,test_index);
+
+		// alarm inducer
+		sample = sensor_data_get();
+		err = mqtt_data_publish(&sample,1);
+
+		if (err < 0) {
+			LOG_ERR("MQTT_PUBLISH ret %d", err);
+			return;
 		}
 	}
 	else if (has_changed & button_states & DK_BTN2_MSK) {
-		//resetting the test
-		test_index = 0;
+	
 	}
+
 	return;
 }
 
@@ -154,15 +176,6 @@ static void buttons_leds_init(void)
 	if (err) {
 		LOG_ERR("Could not set leds state, err code: %d\n", err);
 	}
-}
-
-/* @brief returns a random "sample"*/
-static u8_t sensor_data_get() {
-	u8_t random_sample;
-	
-	random_sample = sys_rand32_get() % 255;
-
-	return random_sample;
 }
 
 void setup_psm(void)
@@ -205,8 +218,6 @@ void app_timer_handler(struct k_timer *dummy)
 		LOG_INF("Awake - transmit true");
 		transmit = true;
 	}
-
-	LOG_INF("MQTT Connection status: %d", mqtt_connected());
 	LOG_INF("Elapsed time: %d\n", minutes);
 }
 
@@ -218,15 +229,16 @@ void timer_init(void)
 	k_timer_start(&app_timer, K_MINUTES(1), K_MINUTES(1));
 }
 
-
-/* @brief updates the global RSRP value when it is received from the modem.*/
+#ifdef CONFIG_MODEM_INFO
+/*@brief updates the global RSRP value when it is received from the modem.*/
 // TODO: make this atomic, so it's not updated while in use.
-/*static void rsrp_notification_handler(char rsrp_value) {
+static void rsrp_notification_handler(char rsrp_value) {
 	rsrp.value = rsrp_value;
-}*/
+}
+#endif
 
-
-/*static int init_modem_info(struct modem_param_info *modem_params) {
+/*
+static int init_modem_info(struct modem_param_info *modem_params) {
 
 	int err;
 
@@ -237,8 +249,78 @@ void timer_init(void)
 	err = modem_info_rsrp_register(rsrp_notification_handler);
 
 	return err;
-*}*/
+}*/
 
+#ifdef TEST_PERIODIC
+static int run_periodic(void) {
+	//static u8_t current_sample;
+	static bool transmit_finished = false;
+	static u8_t sample_cnt = 1;
+
+	//current_sample = sensor_data_get();
+		if (transmit) {
+			//Lighting LED2 to indicate that transmission is initiated
+			dk_set_led(DK_LED2, 0);
+
+			//Data upload
+			//int err = mqtt_data_publish(&current_sample,1);
+			int err = mqtt_data_publish(testData,PERIODIC_MSG_SIZE);
+			if (err < 0) {
+				LOG_ERR("MQTT publish error: %d", err);
+				return err;
+			}
+
+			//LOG_INF("periodic,%s,%d,%d", log_strdup(modem_info_buff), rsrp.value, sample_acc/sample_cnt);
+			//LOG_INF("periodic : %d", current_sample);
+			
+			transmit_finished = true;
+		}
+
+		k_sleep(K_SECONDS(SAMPLE_INTERVAL));
+
+		if(transmit && transmit_finished) {
+			//Transmission phase over.
+			dk_set_led(DK_LED2, 1);
+			transmit = false;
+			transmit_finished = false;
+
+
+			if(sample_cnt >= MAX_SAMPLES) {
+				//exit test
+				return -1;
+			}
+
+			sample_cnt++;
+		}
+
+		return 0;
+}
+#endif
+
+#ifdef TEST_SWEEP
+static int run_size_sweep(void) {
+	static size_t test_index = 0;
+
+	//Lighting LED2 to indicate that transmission is initiated
+
+	LOG_INF("Current test_index: %d", test_index);
+	if(test_index < TEST_DATA_SIZE) {
+		LOG_INF("Transmit");
+		int err = mqtt_data_publish(testData,test_index);
+		if (err < 0) {
+				LOG_ERR("MQTT_PUBLISH ret %d", err);
+				return err;
+		}
+		test_index += SIZE_STEP;
+	} else {
+		//Ending test
+		test_index = 0;
+		return -1;
+	}
+
+	return 0;
+}
+#endif
 
 void main(void)
 {
@@ -249,10 +331,20 @@ void main(void)
 	buttons_leds_init();
 	#ifdef WITH_PSM
 	setup_psm();
+	#else
+	err = lte_lc_psm_req(false);
+	if (err) {
+        LOG_ERR("ERROR: set psm %d\n", err);
+        return;
+    }
 	#endif
+
 	modem_configure();
 
-	//err = init_modem_info(&info_params);
+	#ifdef CONFIG_MODEM_INFO
+		err = modem_info_init();
+		err = modem_info_rsrp_register(rsrp_notification_handler);
+	#endif
 
 	#ifdef WITH_PSM
 	// The network can provide other PSM values. So we fetch the actual values of the network 
@@ -263,7 +355,6 @@ void main(void)
 
 	// Converting TAU to minutes
 	actual_tau = actual_tau/60;
-
 	#endif
 
 	mqtt_start_thread();
@@ -276,54 +367,41 @@ void main(void)
 
 	//LOG_INF("----LOG_START----");
 	//LOG_INF("TYPE | TIME | RSRP | SAMPLE");
-	#ifdef WITH_PSM
+	#ifdef TEST_PERIODIC
 	timer_init();
 	#endif
-
-	u8_t current_sample;
-	bool transmit_finished = false;
 
 	if(err) {
 		LOG_ERR("Initialization error");
 		return;
 	}
 
+	#ifdef TEST_SWEEP
+	k_sleep(K_SECONDS(SWEEP_INTERVAL));
+	#endif
+
 	//Lighting LED1 to indicate that the application is connected and enterin main loop.
 	dk_set_led(DK_LED1, 0);
 
 	while(1) {
-		current_sample = sensor_data_get();
-
-		if (transmit) {
-			//Lighting LED2 to indicate that transmission is initiated
-			dk_set_led(DK_LED2, 0);
-
-			//Data upload
-			err = mqtt_data_publish(&current_sample,1);
+		#ifdef TEST_PERIODIC
+			err = run_periodic();
 			if (err < 0) {
-					LOG_ERR("MQTT_PUBLISH ret %d", err);
-					return;
+				dk_set_led(DK_LED3, 0);
+				LOG_ERR("Error or finished periodic");
+				return;
 			}
-			//LOG_INF("periodic,%s,%d,%d", log_strdup(modem_info_buff), rsrp.value, sample_acc/sample_cnt); */
-			LOG_INF("periodic : %d", current_sample);
-			//alarm_already = false;
-			//sample_cnt = 0;
-			//sample_acc = 0;
-
-			transmit_finished = true;
-		}
-
-		//printk("Current sample: %u\n", current_sample);
-
-		//sample_cnt++;
-		
-		k_sleep(K_SECONDS(SAMPLE_INTERVAL));
-
-		if(transmit && transmit_finished) {
-			//Transmission phase over.
+		#elif defined(TEST_SWEEP)
+			dk_set_led(DK_LED2, 0);
+			if (run_size_sweep() < 0) {
+				dk_set_led(DK_LED3, 0);
+				LOG_ERR("Error or finished sweep");
+				return;
+			}
 			dk_set_led(DK_LED2, 1);
-			transmit = false;
-			transmit_finished = false;
-		}
+			k_sleep(K_SECONDS(SWEEP_INTERVAL));
+		#else
+			k_sleep(K_SECONDS(SAMPLE_INTERVAL));
+		#endif
 	}
 }
