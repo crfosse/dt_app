@@ -16,6 +16,9 @@
 
 LOG_MODULE_REGISTER(app_mqtt_module, CONFIG_APP_LOG_LEVEL);
 
+#define MQTT_THREAD_STACK_SIZE 2048
+#define MQTT_THREAD_PRIORITY -1
+
 /* Thread specifics */
 K_THREAD_STACK_DEFINE(mqtt_stack_area, MQTT_THREAD_STACK_SIZE);
 static void mqtt_thread(void *, void *, void *);
@@ -36,9 +39,6 @@ static struct sockaddr_storage broker;
 
 /* Connected flag */
 static bool connected = false;
-/* ACK flag */
-static bool puback_received = false;
-
 
 /* File descriptor */
 static struct pollfd fds;
@@ -76,7 +76,6 @@ static int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 		log_strdup(CONFIG_MQTT_PUB_TOPIC),
 		(unsigned int)strlen(CONFIG_MQTT_PUB_TOPIC));
 
-	puback_received = false;
 	return mqtt_publish(c, &param);
 }
 
@@ -206,8 +205,6 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 			break;
 		}
 
-		puback_received = true;
-
 		LOG_DBG("[%s:%d] PUBACK packet id: %u\n", log_strdup(__func__), __LINE__,
 				evt->param.puback.message_id);
 		break;
@@ -229,21 +226,6 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 	}
 }
 
-int wait_for_puback(s32_t timeout) {
-	s32_t time = 0;
-
-	while(!puback_received) {
-		k_sleep(100);
-		time += 100;
-		if(time > timeout) {
-			LOG_ERR("PubAck timeout");
-			return -1;
-		}
-	}
-
-	puback_received = false;
-	return 0;
-}
 
 /**@brief Resolves the configured hostname and
  * initializes the MQTT broker structure
@@ -359,7 +341,6 @@ static int fds_init(struct mqtt_client *c)
 	return 0;
 }
 
-
 void mqtt_start_thread() {
     LOG_INF("--- starting mqtt thread ---\n");
 	
@@ -389,12 +370,14 @@ static void mqtt_thread(void *blank1, void *blank2, void *blank3)
 		return;
 	}
 
+	/*Initializes socket*/
 	err = fds_init(&client);
 	if (err != 0) {
 		LOG_ERR("ERROR: fds_init %d\n", err);
 		return;
 	}
 
+	/*Polls and handles events the socket*/
 	while (1) {
 		err = poll(&fds, 1, mqtt_keepalive_time_left(&client));
 		if (err < 0) {

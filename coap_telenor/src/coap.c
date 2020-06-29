@@ -11,7 +11,7 @@
 
 LOG_MODULE_REGISTER(app_coap, CONFIG_APP_LOG_LEVEL);
 
-#define MAX_COAP_MSG_LEN 1472 //With 20 bytes of options this indicates the biggiest possible CoAP packet. Including headers, token, options and payload. Given an MTU of 1500, with IPv4 and UDP overhead. 
+#define MAX_COAP_MSG_LEN 1472 //With 20 bytes of options this indicates the biggest possible CoAP packet. Including headers, token, options and payload. Given an MTU of 1500, with IPv4 and UDP overhead. 
 #define MAX_COAP_OPTIONS 16 //This is maximum received options. 
 
 #define RECV_THREAD_STACK_SIZE 1024

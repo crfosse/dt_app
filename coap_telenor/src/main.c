@@ -8,21 +8,17 @@
 
 LOG_MODULE_REGISTER(app_main, CONFIG_APP_LOG_LEVEL);
 
-#define SAMPLE_INTERVAL 1
-#define SIZE_STEP 100 //1435 bytes max, so we get as close to the limit as possible.
-#define SWEEP_INTERVAL 180 //S
-#define MAX_SAMPLES 5
-
+/* Application settings */
 #define WITH_PSM
-//#define WITH_EDRX
 #define TEST_PERIODIC
 //#define TEST_SWEEP
 
-#define PERIODIC_MSG_SIZE 1280
-
-#define RRC_CON_T 20480 //ms
-
-#define TOTAL_DELAY RRC_CON_T + K_SECONDS(SWEEP_INTERVAL)
+/* Test settings */
+#define SAMPLE_INTERVAL      1 //Seconds
+#define SWEEP_INTERVAL      40 //Seconds
+#define SIZE_STEP           41 //1435 bytes is max, so we get as close to the limit as possible.
+#define MAX_SAMPLES          5
+#define PERIODIC_MSG_SIZE 1280 //Bytes
 
 // The periodic TAU given by the network
 static int actual_tau; 
@@ -34,16 +30,33 @@ static bool transmit = false;
 // Size is restricted my MTU
 #define TEST_DATA_SIZE 1439
 
-//255 random characters in an array for upload testing
-u8_t * testData = "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SXIpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyyaep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF70KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbID"
-				  "jvdEpZVL88RszUn7Ah4pnTC7rkHRft6apfuZCUqo0udcvNbEaUFncwjsU8zkw8j7mfiD7QxF2A9Kv7XTztxef2Ryj1MbWe0vDAPXUz3yb4AqfgcxPb3TCocDCgAd2F2SxlAZ69913oxzD0M24Sl0YIztsCnTuUrzrgIOrdXWvjOcEcuEJltiIZMygVx8gxwcpwY4YNybojiLfuRET4w91tbTgn33IvFcY8J7tu5Y8LZjk5ZfkekJg5zhZs6Bo2Jm"
-				  "N0mC7eCqYvSBGm4No2TPbLjYD2fB5ERubVuo2rGeZjbnWEx8jcP9jgq049pEjjS9MRXvJnDtpo8hIZcZpz1HKyXbOXbz60baSbpW5RHOhwg1TBh8wrBTOOORMMCBhl4OQApYjcf2w4ZlbyfWUjQY6gkGR21599Wb1IjraQL911QeFjiRFGtcDEpxo5GMWL1OZKM4Gnkp4LP0A0yK9FlHeopsaCOBxOI0dTaq2gWDD8rRRCbYykck0J5IZfQnrBbv"
-            	  "AH1MSzQuBq5BLjPC6KhWj519pymLg11fSvhgWlOnhfuSNlmqq9pysYmZIPUNKGOP9gfpEKm8tCuvpUWZvoFsrmxfYQNe9vUznG0PZMhHDSc5C6wDBpFqDBhHEHRdg0KRDf8CU5RsaaviBtI8yFb0plaRQjzTYg2xZcppX4NANeqB0udVdEdfhIxX6iVXcEb5lGY0a35dDRjCgL7ePgZn7oQbLuusUurDbprEu2msxDXz94KJPwhnMldretN5bgq7"
-				  "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SXIpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyyaep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF70KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbID"
-				  "jvdEpZVL88RszUn7Ah4pnTC7rkHRft6apfuZCUqo0udcvNbEaUFncwjsU8zkw8j7mfiD7QxF2A9Kv7XTztxef2Ryj1MbWe0vDAPXUz3yb4AqfgcxPb3TCocDCgAd2F2SxlAZ69913oxk5ZfkekJg5zhZs6Bo2Ja";
+//1440 random characters in an array for upload testing
+u8_t * testData = "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SX"
+				  "IpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyya"
+				  "ep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF7"
+				  "0KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbID"
+				  "jvdEpZVL88RszUn7Ah4pnTC7rkHRft6apfuZCUqo0udcvNbEaUFncwjsU8zkw8j7"
+				  "mfiD7QxF2A9Kv7XTztxef2Ryj1MbWe0vDAPXUz3yb4AqfgcxPb3TCocDCgAd2F2S"
+				  "xlAZ69913oxzD0M24Sl0YIztsCnTuUrzrgIOrdXWvjOcEcuEJltiIZMygVx8gxwc"
+				  "pwY4YNybojiLfuRET4w91tbTgn33IvFcY8J7tu5Y8LZjk5ZfkekJg5zhZs6Bo2Jm"
+				  "N0mC7eCqYvSBGm4No2TPbLjYD2fB5ERubVuo2rGeZjbnWEx8jcP9jgq049pEjjS9"
+				  "MRXvJnDtpo8hIZcZpz1HKyXbOXbz60baSbpW5RHOhwg1TBh8wrBTOOORMMCBhl4O"
+				  "QApYjcf2w4ZlbyfWUjQY6gkGR21599Wb1IjraQL911QeFjiRFGtcDEpxo5GMWL1O"
+				  "ZKM4Gnkp4LP0A0yK9FlHeopsaCOBxOI0dTaq2gWDD8rRRCbYykck0J5IZfQnrBbv"
+            	  "AH1MSzQuBq5BLjPC6KhWj519pymLg11fSvhgWlOnhfuSNlmqq9pysYmZIPUNKGOP"
+				  "9gfpEKm8tCuvpUWZvoFsrmxfYQNe9vUznG0PZMhHDSc5C6wDBpFqDBhHEHRdg0KR"
+				  "Df8CU5RsaaviBtI8yFb0plaRQjzTYg2xZcppX4NANeqB0udVdEdfhIxX6iVXcEb5"
+				  "lGY0a35dDRjCgL7ePgZn7oQbLuusUurDbprEu2msxDXz94KJPwhnMldretN5bgq7"
+				  "yK3vQHgUQ1WBUNPGprMSh0o1ZOTpGzC788DMB0OoQytSTDmKo7zeybWdx1DGh3SX"
+				  "IpfkYHSkX3hQuEUdWC8jWBq6qRAzv4NB79aECZwwUsReylQcJOzZ4NW1rY3xbyya"
+				  "ep9DOEWnRsWkjILrSh4crLHlfvmqVLxRjA1dDvHx72JVD4rvhhLbcQ6Gi94lvVF7"
+				  "0KmnO4Lh7IRGUm37TVXzQXtRnb228WPngoCC5Ge4GZNmBRFhXWtgeuU9Vt2JJbID"
+				  "jvdEpZVL88RszUn7Ah4pnTC7rkHRft6apfuZCUqo0udcvNbEaUFncwjsU8zkw8j7"
+				  "mfiD7QxF2A9Kv7XTztxef2Ryj1MbWe0vDAPXUz3yb4AqfgcxPb3TCocDCgAd2F2S"
+				  "xlAZ69913oxk5ZfkekJg5zhZs6Bo2Ja";
 
 
-
+/* @brief Message post function derived from Telenor's code */
 static int message_post(struct coap_resource *resource, struct coap_packet *request, struct sockaddr *addr, socklen_t addr_len) {
 	coap_endpoint *coap = resource->user_data;
 
@@ -61,6 +74,24 @@ static int message_post(struct coap_resource *resource, struct coap_packet *requ
 	}
 
 	return 0;
+}
+
+/* @brief Used to instantiate different variables needed for CoAP operation */
+void init_endpoint(void) {
+	struct sockaddr_in local_addr = {
+		.sin_family = AF_INET,
+		.sin_port = htons(5683),
+	};
+	coap = coap_endpoint_init((struct sockaddr *)&local_addr, sizeof(local_addr), resources);
+	if (coap == NULL) {
+		LOG_ERR("coap_endpoint_init");
+		return;
+	}
+
+	resources[0].user_data = coap;
+
+	// Telenor's IP address.
+	net_addr_pton(AF_INET, "172.16.15.14", &remote_addr.sin_addr);
 }
 
 static const char * const message_path[] = { "message", NULL };
@@ -151,16 +182,6 @@ static void buttons_leds_init(void)
 	}
 }
 
-/* @brief returns a random "sample"*/
-static u8_t sensor_data_get() {
-	u8_t random_sample;
-	
-	random_sample = sys_rand32_get() % 255;
-
-	return random_sample;
-}
-
-
 void setup_psm(void)
 {
 	/*
@@ -191,6 +212,7 @@ void setup_psm(void)
 	}
 }
 
+/* Timer used during TEST_PERIODIC to initiate transmission at the designated interval */
 void app_timer_handler(struct k_timer *dummy)
 {
 	static u32_t minutes;
@@ -212,32 +234,12 @@ void timer_init(void)
 	k_timer_start(&app_timer, K_MINUTES(1), K_MINUTES(1));
 }
 
-void init_endpoint(void) {
-	struct sockaddr_in local_addr = {
-		.sin_family = AF_INET,
-		.sin_port = htons(5683),
-	};
-	coap = coap_endpoint_init((struct sockaddr *)&local_addr, sizeof(local_addr), resources);
-	if (coap == NULL) {
-		LOG_ERR("coap_endpoint_init");
-		return;
-	}
-
-	resources[0].user_data = coap;
-
-	net_addr_pton(AF_INET, "172.16.15.14", &remote_addr.sin_addr);
-}
 
 #ifdef TEST_PERIODIC
-
-
-
 static int run_periodic(void) {
-	//static u8_t current_sample;
 	static u8_t sample_cnt = 1;
 	static bool transmit_finished = false;
 	
-	//current_sample = sensor_data_get();
 		if (transmit) {
 			//Lighting LED2 to indicate that transmission is initiated
 			dk_set_led(DK_LED2, 0);
@@ -248,10 +250,6 @@ static int run_periodic(void) {
 				LOG_ERR("coap_endpoint_post: %d", ret);
 				return -1;
 			}
-
-			//LOG_INF("periodic,%s,%d,%d", log_strdup(modem_info_buff), rsrp.value, sample_acc/sample_cnt);
-			//LOG_INF("periodic : %d", current_sample);
-			
 			transmit_finished = true;			
 		}
 
@@ -298,7 +296,7 @@ static int run_size_sweep(void) {
 #endif
 
 void main() {
-	LOG_INF("CoAP sample application started");
+	LOG_INF("\nDT CoAP application example started\n");
 	
 	int err;
 	
@@ -307,6 +305,7 @@ void main() {
 	#ifdef WITH_PSM
 	setup_psm();
 	#else
+	/* Force PSM off in case the modem uses old PSM settings */
 	err = lte_lc_psm_req(false);
 	#endif
 
@@ -316,10 +315,10 @@ void main() {
 	init_endpoint();
 
 	#ifdef WITH_PSM
+
 	// The network can provide other PSM values. So we fetch the actual values of the network 
 	int curr_active;
 	lte_lc_psm_get(&actual_tau, &curr_active);
-	//lte_lc_psm_get_with_cb();
 	LOG_INF("Reqested: TAU = %s | AT = %s", log_strdup(CONFIG_LTE_PSM_REQ_RPTAU), log_strdup(CONFIG_LTE_PSM_REQ_RAT));
 	LOG_INF("Got: TAU = %d | AT = %d", actual_tau, curr_active);
 	#endif
@@ -334,7 +333,7 @@ void main() {
 		k_sleep(K_SECONDS(SWEEP_INTERVAL));
 	#endif
 
-	//Lighting LED1 to indicate that the application is connected and enterin main loop.
+	//Lighting LED1 to indicate that the application is connected and entering main loop.
 	dk_set_led(DK_LED1, 0);
 	while(1) {
 		#ifdef TEST_PERIODIC
@@ -353,7 +352,7 @@ void main() {
 				return;
 			}
 			dk_set_led(DK_LED2, 1);
-			k_sleep(TOTAL_DELAY);
+			k_sleep(SWEEP_INTERVAL);
 		#else
 			k_sleep(K_SECONDS(SAMPLE_INTERVAL));
 		#endif
